@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <canvas id="canvas" width="1450" height="725" style="border:3px solid #080808;"></canvas>
+    <br>
+    Model Height Adjustment <input type="range" min="-100" max="100" value="0" class="slider" id="ModelHeight">
+    Shader Noise <input type="range" min="0" max="200" value="30" class="slider" id="Noise">
+    Camera Position <input type="range" min="0" max="200" value="30" class="slider" id="Around"><br>
+    Superimposed Wireframe <input id="Wireframe" type="checkbox"><br>
+    <input type="file" onchange="openFile(event)"><div id="Obj Scale"></div>
+</body>
+<script src="http://graphics.cs.wisc.edu/JS/twgl-full.min.js"></script>
+<script> "use strict"
+    var canvas = document.getElementById("canvas");
+    var ctx = canvas.getContext("2d");
+    
+    var Yrot = document.getElementById("Yrot");
+    var modelHeight = document.getElementById("ModelHeight");
+    var noise = document.getElementById("Noise");
+    var Around = document.getElementById("Around");
+    
+    var wireframeCheckbox = document.getElementById("Wireframe");
+    
+    var m4 = twgl.m4;
+    
+    
+    function Shape(vertices, faces, importScale){
+        this.vertices = vertices;
+        this.faces = faces;
+        this.importScale = importScale;
+    }
+    
+    var triangleBuffer = [];
+    
+    function BufferTri(){
+        this.verts2d = [];
+        this.depth = 0;
+        this.color;
+    }
+    
+    
+    
+    var camPos = [0,0,0];
+    var camYRot = 0;
+    var camXRot = 0;
+    var camZRot = 0;
+    
+    var wavefrontShape;
+    var wavefrontScaleInput;
+    
+    var liftShape;
+    var forkShape;
+    var wheelShape;
+    
+    
+    var openFile = function(event) {
+        
+        var inputFile = event.target.files[0];
+        var reader = new FileReader();
+        var inputText;
+        
+        reader.onload = function(){
+            inputText = reader.result;
+            
+            if (wavefrontScaleInput == null){
+                wavefrontScaleInput = document.createElement("INPUT");
+            }
+            wavefrontScaleInput.setAttribute("type", "number");
+            
+            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
+            wavefrontScaleInput.value = .15;
+            
+            wavefrontScaleInput.addEventListener("input", function (e){
+                wavefrontShape.importScale = wavefrontScaleInput.value;
+            });
+            
+            wavefrontShape = createFromWavefront(inputText);
+            
+        };
+        
+        reader.readAsText(inputFile);
+    };
+    
+    
+    /*
+    var openLift = function(event) {
+        
+        var inputFile = event.target.files[0];
+        var reader = new FileReader();
+        var inputText;
+        
+        reader.onload = function(){
+            inputText = reader.result;
+            
+            if (wavefrontScaleInput == null){
+                wavefrontScaleInput = document.createElement("INPUT");
+            }
+            wavefrontScaleInput.setAttribute("type", "number");
+            
+            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
+            
+            wavefrontScaleInput.addEventListener("input", function (e){
+                wavefrontShape.importScale = wavefrontScaleInput.value;
+                liftShape.importScale = wavefrontScaleInput.value;
+            });
+            
+            liftShape = createFromWavefront(inputText);
+            
+        };
+        
+        reader.readAsText(inputFile);
+    };
+    var openFork = function(event) {
+        
+        var inputFile = event.target.files[0];
+        var reader = new FileReader();
+        var inputText;
+        
+        reader.onload = function(){
+            inputText = reader.result;
+            
+            if (wavefrontScaleInput == null){
+                wavefrontScaleInput = document.createElement("INPUT");
+            }
+            wavefrontScaleInput.setAttribute("type", "number");
+            
+            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
+            
+            wavefrontScaleInput.addEventListener("input", function (e){
+                wavefrontShape.importScale = wavefrontScaleInput.value;
+                forkShape.importScale = wavefrontScaleInput.value;
+            });
+            
+            forkShape = createFromWavefront(inputText);
+            
+        };
+        
+        reader.readAsText(inputFile);
+    };
+    var openWheel = function(event) {
+        
+        var inputFile = event.target.files[0];
+        var reader = new FileReader();
+        var inputText;
+        
+        reader.onload = function(){
+            inputText = reader.result;
+            
+            if (wavefrontScaleInput == null){
+                wavefrontScaleInput = document.createElement("INPUT");
+            }
+            wavefrontScaleInput.setAttribute("type", "number");
+            
+            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
+            //wavefrontScaleInput.value = 1;
+            
+            wavefrontScaleInput.addEventListener("input", function (e){
+                wavefrontShape.importScale = wavefrontScaleInput.value;
+                wheelShape.importScale = wavefrontScaleInput.value;
+            });
+            
+            wheelShape = createFromWavefront(inputText);
+            
+        };
+        
+        reader.readAsText(inputFile);
+    };*/
+    
+    function createFromWavefront(text){
+        
+        var lines = text.split("\n");
+        
+        var objVertices = [];
+        var objFaces = [];
+        
+        lines.forEach(function (l){
+            if (l.substring(0,2) === "v "){
+                var currentVertex = [];
+                var currentEntry = "";
+                
+                var i = 2;
+                while (l.charAt(i) !== " "){
+                    currentEntry += l.charAt(i);
+                    i++;
+                }
+                currentVertex[0] = parseFloat(currentEntry);
+                
+                i++;
+                currentEntry = "";
+                
+                while (l.charAt(i) !== " "){
+                    currentEntry += l.charAt(i);
+                    i++;
+                }
+                currentVertex[1] = parseFloat(currentEntry);
+                currentVertex[2] = parseFloat(l.substring(i+1));
+                
+                objVertices.push(currentVertex);
+            }
+            else if (l.substring(0,2) === "f "){
+                var currentFace = [];
+                var currentEntry = "";
+                
+                var lineElements = l.split(" ");
+                
+                var i = 0;
+                while(lineElements[1].charAt(i) !== "/"){
+                    currentEntry += lineElements[1].charAt(i);
+                    i++;
+                }
+                currentFace[0] = parseInt(currentEntry) - 1;
+                currentEntry = "";
+                i = 0;
+                while(lineElements[2].charAt(i) !== "/"){
+                    currentEntry += lineElements[2].charAt(i);
+                    i++;
+                }
+                currentFace[1] = parseInt(currentEntry) - 1;
+                currentEntry = "";
+                i = 0;
+                while(lineElements[3].charAt(i) !== "/"){
+                    currentEntry += lineElements[3].charAt(i);
+                    i++;
+                }
+                currentFace[2] = parseInt(currentEntry) - 1;
+                
+                objFaces.push(currentFace);
+                
+                //Quad support.
+                if (lineElements.length > 4){
+                    var secondFace = [];
+                    secondFace.push(currentFace[0]);
+                    secondFace.push(currentFace[2]);
+                    
+                    currentEntry = "";
+                    i = 0;
+                    while(lineElements[4].charAt(i) !== "/"){
+                        currentEntry += lineElements[4].charAt(i);
+                        i++;
+                    }
+                    secondFace.push(parseInt(currentEntry) - 1);
+                    
+                    objFaces.push(secondFace);
+                    
+                }
+                
+                
+            }
+        });
+        
+        if (wavefrontScaleInput){
+            return new Shape(objVertices, objFaces, wavefrontScaleInput.value);
+        } else {
+            return new Shape(objVertices, objFaces, 1);
+        }
+    }
+    
+    
+    var pyramidTestShape = new Shape(
+        [[0,0,40],
+        [50,50,0],
+        [50,-50,0],
+        [-50,-50,0],
+        [-50,50,0]],
+
+        [[0,1,2],
+        [0,2,3],
+        [0,3,4],
+        [0,4,1],
+        [1,2,3],
+        [1,3,4]],
+        
+        .1
+    );
+    
+    /*var pyramidTestShape = new Shape(
+        [[0,0,40],
+        [50,50,0],
+        [50,-50,0],
+        [-50,-50,0],
+        [-50,50,0]],
+
+        [[0,1,2],
+        [0,2,3],
+        [0,3,4],
+        [0,4,1],
+        [0,1,3]],
+        
+        .1
+    );*/
+    
+    function commitShapeToBuffer(shape, objectMatrix, cameraMatrix){
+        var cVertex = [0,0,0];
+        
+        var importScaleMatrix = m4.identity();
+        m4.multiply(importScaleMatrix,
+                    m4.scaling([shape.importScale,shape.importScale,shape.importScale]),
+                    importScaleMatrix);
+        
+        shape.faces.forEach(function(face){
+            
+            var newTri = new BufferTri();
+            
+            //ctx.beginPath();
+            for (var i = 0; i < 3; i++){
+                
+                m4.transformPoint(importScaleMatrix,shape.vertices[face[i]],cVertex);
+                m4.transformPoint(objectMatrix,cVertex,cVertex);
+                m4.transformPoint(cameraMatrix,cVertex,cVertex);
+
+                cVertex[0] /= (-cVertex[2]/1000);
+                cVertex[1] /= (-cVertex[2]/1000);
+                
+                
+                newTri.verts2d[i] = [cVertex[0]+canvas.width/2 +Math.random()*noise.value/10,
+                                     cVertex[1]+canvas.height/2+Math.random()*noise.value/10];
+                newTri.depth += cVertex[2];
+                
+                /*
+                if (i == 0){
+                    ctx.moveTo(cVertex[0]+canvas.width/2,cVertex[1]+canvas.height/2);
+                } else {
+                    ctx.lineTo(cVertex[0]+canvas.width/2,cVertex[1]+canvas.height/2);
+                }*/
+            }
+            
+            //newTri.depth /= 3;
+            
+            triangleBuffer.push(newTri);
+            
+            /*
+            ctx.closePath();
+            ctx.strokeStyle = "black";
+            ctx.stroke();*/
+        });
+    }
+    
+    function colorizeBuffer(){
+        triangleBuffer.forEach(function (obj){
+            obj.color = getRandomColor(obj.depth);
+        });
+    }
+    
+    function sortBuffer(){
+        triangleBuffer.sort(function(a, b){
+            return a.depth - b.depth;
+        });
+    }
+    
+    function drawBuffer(){
+        triangleBuffer.forEach(function(tri){
+            
+            ctx.beginPath();
+            ctx.moveTo(tri.verts2d[0][0], tri.verts2d[0][1]);
+            ctx.lineTo(tri.verts2d[1][0], tri.verts2d[1][1]);
+            ctx.lineTo(tri.verts2d[2][0], tri.verts2d[2][1]);
+            ctx.closePath();
+            
+            ctx.fillStyle = tri.color;
+            ctx.fill();
+            
+        });
+    }
+    
+    function drawShape(shape, objectMatrix, cameraMatrix){
+        var cVertex = [0,0,0];
+        
+        var importScaleMatrix = m4.identity();
+        m4.multiply(importScaleMatrix,
+                    m4.scaling([shape.importScale,shape.importScale,shape.importScale]),
+                    importScaleMatrix);
+        
+        shape.faces.forEach(function(face){
+            
+            ctx.beginPath();
+            for (var i = 0; i < 3; i++){
+                
+                m4.transformPoint(importScaleMatrix,shape.vertices[face[i]],cVertex);
+                m4.transformPoint(objectMatrix,cVertex,cVertex);
+                m4.transformPoint(cameraMatrix,cVertex,cVertex);
+
+                cVertex[0] /= (-cVertex[2]/1000);
+                cVertex[1] /= (-cVertex[2]/1000);
+
+                if (i == 0){
+                    ctx.moveTo(cVertex[0]+canvas.width/2,cVertex[1]+canvas.height/2);
+                } else {
+                    ctx.lineTo(cVertex[0]+canvas.width/2,cVertex[1]+canvas.height/2);
+                }
+            }
+            ctx.closePath();
+            ctx.strokeStyle = "black";
+            ctx.stroke();
+        });
+    }
+    
+    // This seeded random color generator is directly based on the 11/15/2011 post by stackoverflow user Useless Code.
+    var randomColorSeed = 0;
+    function getRandomColor(depth){
+        randomColorSeed += 2.222;
+        var col = Math.floor((Math.abs(Math.sin(randomColorSeed) * 16777215)) % 16777215).toString(16);
+        return getDepthColor(col,depth);
+    }
+    
+    function getDepthColor(c1,depth){
+        var avg = "#";
+        avg = avg + Math.floor(parseInt(c1.slice(0,2),16)/( ((-18-depth)/5) )).toString(16);
+        avg = avg + Math.floor(parseInt(c1.slice(2,4),16)/( ((-18-depth)/5) )).toString(16);
+        return avg+ Math.floor(parseInt(c1.slice(4,6),16)/( ((-18-depth)/5) )).toString(16);
+    }
+    
+    window.requestAnimationFrame(update);
+    var startTime = null;
+    function update(timestamp){
+        if (!startTime){startTime = timestamp;}
+        var currTime = (timestamp - startTime)/1000;
+        
+        canvas.width = canvas.width; //Clear frame
+        ctx.beginPath();
+        ctx.rect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#202020";
+        ctx.fill();
+        triangleBuffer = []; //Clear triangle buffer
+        randomColorSeed = 0;
+        
+        var camDist = 50;
+        
+        camPos = [camDist * Math.sin(Around.value / 100 * Math.PI), -13, camDist * Math.cos(Around.value / 100 * Math.PI)];
+        camYRot = 0;
+        camYRot += -Math.PI * Around.value / 100;
+        camXRot = Math.PI * -.05;
+        camZRot = 0;
+        
+        var matrixStack = [];
+        var matrix = m4.identity();
+        matrixStack.unshift(m4.identity());
+        matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(Math.PI*.5)));
+        var objMatrix = m4.multiply(matrix,m4.rotationX(Math.PI*.5));
+        
+        
+        var camMatrix = m4.identity();
+        m4.multiply(camMatrix,m4.translation([-camPos[0],-camPos[1],-camPos[2]]),camMatrix);
+        m4.multiply(camMatrix,m4.rotationY(camYRot),camMatrix);
+        m4.multiply(camMatrix,m4.rotationX(camXRot),camMatrix);
+        m4.multiply(camMatrix,m4.rotationZ(camZRot),camMatrix);
+        
+        
+        // How to translate.
+        //m4.multiply(matrix,m4.translation([500,300,0]),matrix);
+        // How to rotate around an axis.
+        //m4.multiply(matrix,m4.rotationY(Math.PI*.5),matrix);
+        // How to scale.
+        //m4.multiply(matrix,m4.scaling([.8, .8, .8]),matrix);
+        
+        
+        if (wavefrontShape != null){
+            m4.multiply(matrix, m4.rotationX(Math.PI), matrix);
+            m4.multiply(matrix, m4.translation([0,-modelHeight.value/5,0]),matrix);
+            commitShapeToBuffer(wavefrontShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.1)), camMatrix);
+        }
+        /*
+        if (liftShape != null){
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.translation([0,-Xrot.value*1.3/100*wavefrontScaleInput.value,0])));
+            drawShape(liftShape, matrixStack[0], camMatrix);
+        }
+        if (forkShape != null){
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.translation([0,-Yrot.value/100*wavefrontScaleInput.value,0])));
+            drawShape(forkShape, matrixStack[0], camMatrix);
+            matrixStack.shift();
+        }
+        if (liftShape != null){
+            matrixStack.shift();
+        }*/
+        
+        /*
+        if (wheelShape != null){
+            // Front Right
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
+            
+            matrixStack.unshift(m4.multiply(matrixStack[0],
+                m4.translation([-.95*wavefrontScaleInput.value,
+                                .1*wavefrontScaleInput.value,
+                                1.75*wavefrontScaleInput.value])));
+            
+            drawShape(wheelShape, matrixStack[0], camMatrix);
+            matrixStack.shift();
+            matrixStack.shift();
+            
+            // Back Right
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
+            
+            matrixStack.unshift(m4.multiply(matrixStack[0],
+                m4.translation([-.95*wavefrontScaleInput.value,
+                                .1*wavefrontScaleInput.value,
+                                -1.75*wavefrontScaleInput.value])));
+            drawShape(wheelShape, matrixStack[0], camMatrix);
+            matrixStack.shift();
+            matrixStack.shift();
+            
+            // Front Left
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.scaling([-1,-1,-1])));
+            
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
+            
+            matrixStack.unshift(m4.multiply(matrixStack[0],
+                m4.translation([.95*wavefrontScaleInput.value,
+                                .1*wavefrontScaleInput.value,
+                                1.75*wavefrontScaleInput.value])));
+            drawShape(wheelShape, matrixStack[0], camMatrix);
+            matrixStack.shift();
+            matrixStack.shift();
+            matrixStack.shift();
+            
+            // Back Left
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.scaling([-1,-1,-1])));
+            
+            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
+            
+            matrixStack.unshift(m4.multiply(matrixStack[0],
+                m4.translation([.95*wavefrontScaleInput.value,
+                                .1*wavefrontScaleInput.value,
+                                -1.75*wavefrontScaleInput.value])));
+            drawShape(wheelShape, matrixStack[0], camMatrix);
+            matrixStack.shift();
+            matrixStack.shift();
+            matrixStack.shift();
+        }*/
+        
+        if (wavefrontShape == null){
+            
+            commitShapeToBuffer(pyramidTestShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.6)), camMatrix);
+            
+            
+            drawShape(pyramidTestShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.6)), camMatrix);
+            
+            
+        }
+        
+        colorizeBuffer();
+        sortBuffer();
+        drawBuffer();
+        
+        if (wireframeCheckbox.checked){
+            if (wavefrontShape != null){
+                drawShape(wavefrontShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.1)), camMatrix);
+            }
+            if (wavefrontShape == null){
+                drawShape(pyramidTestShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.6)), camMatrix);
+            }
+        }
+        
+        window.requestAnimationFrame(update);
+    }
+    
+    
+</script>
+</html>
