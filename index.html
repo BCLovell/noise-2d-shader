@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html>
 <body>
-    <canvas id="canvas" width="1450" height="725" style="border:3px solid #080808;"></canvas>
+    <canvas id="canvas" width="1200" height="650" style="border:3px solid #080808;"></canvas>
     <br>
     Model Height Adjustment <input type="range" min="-100" max="100" value="0" class="slider" id="ModelHeight">
     Shader Noise <input type="range" min="0" max="200" value="30" class="slider" id="Noise">
     Camera Position <input type="range" min="0" max="200" value="30" class="slider" id="Around"><br>
     Superimposed Wireframe <input id="Wireframe" type="checkbox"><br>
-    <input type="file" onchange="openFile(event)"><div id="Obj Scale"></div>
+    <input type="file" onchange="openFile(event)">Object Scale <div id="Obj Scale"></div>
 </body>
-<script src="http://graphics.cs.wisc.edu/JS/twgl-full.min.js"></script>
+<script src="./twgl-full.min.js"></script>
 <script> "use strict"
+    
+    // Getting items from the html
     var canvas = document.getElementById("canvas");
     var ctx = canvas.getContext("2d");
     
@@ -21,9 +23,10 @@
     
     var wireframeCheckbox = document.getElementById("Wireframe");
     
+    // twgl is a barebones matrix transformation calculation library.
     var m4 = twgl.m4;
     
-    
+    // Internal format for a shape
     function Shape(vertices, faces, importScale){
         this.vertices = vertices;
         this.faces = faces;
@@ -32,6 +35,7 @@
     
     var triangleBuffer = [];
     
+    // Format for a triangle ready to be drawn in 2D space.
     function BufferTri(){
         this.verts2d = [];
         this.depth = 0;
@@ -39,20 +43,16 @@
     }
     
     
-    
+    // Variable declaration and initialization
     var camPos = [0,0,0];
     var camYRot = 0;
     var camXRot = 0;
     var camZRot = 0;
     
-    var wavefrontShape;
-    var wavefrontScaleInput;
+    var wavefrontShape; // Current loaded shape.
+    var wavefrontScaleInput; // Scale factor for current shape.
     
-    var liftShape;
-    var forkShape;
-    var wheelShape;
-    
-    
+    // Code that runs when a file is input to the program.
     var openFile = function(event) {
         
         var inputFile = event.target.files[0];
@@ -68,13 +68,13 @@
             wavefrontScaleInput.setAttribute("type", "number");
             
             document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
-            wavefrontScaleInput.value = 5;
+            wavefrontScaleInput.value = 5; // Default scale factor
             
             wavefrontScaleInput.addEventListener("input", function (e){
                 wavefrontShape.importScale = wavefrontScaleInput.value;
             });
             
-            wavefrontShape = createFromWavefront(inputText);
+            wavefrontShape = createFromWavefront(inputText); // Reads model as given.
             
         };
         
@@ -82,11 +82,12 @@
     };
     
     
-    
+    // Parses relevant parts of wavefront file
     function createFromWavefront(text){
         
         var lines = text.split("\n");
         
+        // Variables required to build the Shape entity
         var objVertices = [];
         var objFaces = [];
         
@@ -168,11 +169,11 @@
         if (wavefrontScaleInput){
             return new Shape(objVertices, objFaces, wavefrontScaleInput.value);
         } else {
-            return new Shape(objVertices, objFaces, 1);
+            return new Shape(objVertices, objFaces, 5);
         }
     }
     
-    
+    // Basic pyramid shape in internal format
     var pyramidTestShape = new Shape(
         [[0,0,40],
         [50,50,0],
@@ -190,6 +191,7 @@
         .1
     );
     
+    // Adds a shape to the buffer of triangles that need to be drawn.
     function commitShapeToBuffer(shape, objectMatrix, cameraMatrix){
         var cVertex = [0,0,0];
         
@@ -198,20 +200,23 @@
                     m4.scaling([shape.importScale,shape.importScale,shape.importScale]),
                     importScaleMatrix);
         
+        // Add all faces as triangles to the buffer.
         shape.faces.forEach(function(face){
             
             var newTri = new BufferTri();
             
             for (var i = 0; i < 3; i++){
                 
+                // Transformations from local space to global space.
                 m4.transformPoint(importScaleMatrix,shape.vertices[face[i]],cVertex);
                 m4.transformPoint(objectMatrix,cVertex,cVertex);
                 m4.transformPoint(cameraMatrix,cVertex,cVertex);
-
+                
+                // These lines add perspective to the shape's appearance.
                 cVertex[0] /= (-cVertex[2]/1000);
                 cVertex[1] /= (-cVertex[2]/1000);
                 
-                
+                // Sets buffer triangle attributes
                 newTri.verts2d[i] = [cVertex[0]+canvas.width/2 +Math.random()*noise.value/10,
                                      cVertex[1]+canvas.height/2+Math.random()*noise.value/10];
                 newTri.depth += cVertex[2];
@@ -223,18 +228,21 @@
         });
     }
     
+    // Colorizes each triangle in the buffer
     function colorizeBuffer(){
         triangleBuffer.forEach(function (obj){
             obj.color = getRandomColor(obj.depth);
         });
     }
     
+    // Sorts triangles within the buffer by depth
     function sortBuffer(){
         triangleBuffer.sort(function(a, b){
             return a.depth - b.depth;
         });
     }
     
+    // Draws each triangle in the triangle buffer.
     function drawBuffer(){
         triangleBuffer.forEach(function(tri){
             
@@ -250,6 +258,7 @@
         });
     }
     
+    // Draws shape in wireframe.
     function drawShape(shape, objectMatrix, cameraMatrix){
         var cVertex = [0,0,0];
         
@@ -266,7 +275,8 @@
                 m4.transformPoint(importScaleMatrix,shape.vertices[face[i]],cVertex);
                 m4.transformPoint(objectMatrix,cVertex,cVertex);
                 m4.transformPoint(cameraMatrix,cVertex,cVertex);
-
+                
+                // These lines add perspective to the shape's appearance.
                 cVertex[0] /= (-cVertex[2]/1000);
                 cVertex[1] /= (-cVertex[2]/1000);
 
@@ -283,6 +293,7 @@
     }
     
     // This seeded random color generator is directly based on the 11/15/2011 post by stackoverflow user Useless Code.
+    // It is needed so that faces can retain their same colors from frame to frame.
     var randomColorSeed = 0;
     function getRandomColor(depth){
         randomColorSeed += 2.222;
@@ -290,6 +301,7 @@
         return getDepthColor(col,depth);
     }
     
+    // This function returns the shaded color that a face should have given its depth and base color.
     function getDepthColor(c1,depth){
         var avg = "#";
         avg = avg + Math.floor(parseInt(c1.slice(0,2),16)/( ((-18-depth)/5) )).toString(16);
@@ -299,10 +311,13 @@
     
     window.requestAnimationFrame(update);
     var startTime = null;
+    // Main update loop for each animation frame.
     function update(timestamp){
+        // Getting time in seconds.
         if (!startTime){startTime = timestamp;}
         var currTime = (timestamp - startTime)/1000;
         
+        // Reset html5 canvas to solid color.
         canvas.width = canvas.width; //Clear frame
         ctx.beginPath();
         ctx.rect(0,0,canvas.width,canvas.height);
@@ -311,21 +326,16 @@
         triangleBuffer = []; //Clear triangle buffer
         randomColorSeed = 0;
         
-        var camDist = 50;
+        var camDist = 50; // Reasonable value for camera distance from origin.
         
+        // Animated values for circling the camera around the object.
         camPos = [camDist * Math.sin(Around.value / 100 * Math.PI), -13, camDist * Math.cos(Around.value / 100 * Math.PI)];
         camYRot = 0;
         camYRot += -Math.PI * Around.value / 100;
         camXRot = Math.PI * -.05;
         camZRot = 0;
         
-        var matrixStack = [];
-        var matrix = m4.identity();
-        matrixStack.unshift(m4.identity());
-        matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(Math.PI*.5)));
-        var objMatrix = m4.multiply(matrix,m4.rotationX(Math.PI*.5));
-        
-        
+        // Application of transformations to camera orientation.
         var camMatrix = m4.identity();
         m4.multiply(camMatrix,m4.translation([-camPos[0],-camPos[1],-camPos[2]]),camMatrix);
         m4.multiply(camMatrix,m4.rotationY(camYRot),camMatrix);
@@ -333,26 +343,24 @@
         m4.multiply(camMatrix,m4.rotationZ(camZRot),camMatrix);
         
         
+        var matrix = m4.identity(); // Matrix to be transformed and applied to shape.
+        
         if (wavefrontShape != null){
             m4.multiply(matrix, m4.rotationX(Math.PI), matrix);
             m4.multiply(matrix, m4.translation([0,-modelHeight.value/5,0]),matrix);
             commitShapeToBuffer(wavefrontShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.1)), camMatrix);
         }
-        
         if (wavefrontShape == null){
-            
             commitShapeToBuffer(pyramidTestShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.6)), camMatrix);
-            
-            
             drawShape(pyramidTestShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.6)), camMatrix);
-            
-            
         }
         
+        // Finish creating the buffer and draw it.
         colorizeBuffer();
         sortBuffer();
         drawBuffer();
         
+        // Draw wireframe if option is selected.
         if (wireframeCheckbox.checked){
             if (wavefrontShape != null){
                 drawShape(wavefrontShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.1)), camMatrix);
@@ -362,6 +370,7 @@
             }
         }
         
+        // Repeat update loop.
         window.requestAnimationFrame(update);
     }
     
