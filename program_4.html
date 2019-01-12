@@ -82,89 +82,6 @@
     };
     
     
-    /*
-    var openLift = function(event) {
-        
-        var inputFile = event.target.files[0];
-        var reader = new FileReader();
-        var inputText;
-        
-        reader.onload = function(){
-            inputText = reader.result;
-            
-            if (wavefrontScaleInput == null){
-                wavefrontScaleInput = document.createElement("INPUT");
-            }
-            wavefrontScaleInput.setAttribute("type", "number");
-            
-            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
-            
-            wavefrontScaleInput.addEventListener("input", function (e){
-                wavefrontShape.importScale = wavefrontScaleInput.value;
-                liftShape.importScale = wavefrontScaleInput.value;
-            });
-            
-            liftShape = createFromWavefront(inputText);
-            
-        };
-        
-        reader.readAsText(inputFile);
-    };
-    var openFork = function(event) {
-        
-        var inputFile = event.target.files[0];
-        var reader = new FileReader();
-        var inputText;
-        
-        reader.onload = function(){
-            inputText = reader.result;
-            
-            if (wavefrontScaleInput == null){
-                wavefrontScaleInput = document.createElement("INPUT");
-            }
-            wavefrontScaleInput.setAttribute("type", "number");
-            
-            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
-            
-            wavefrontScaleInput.addEventListener("input", function (e){
-                wavefrontShape.importScale = wavefrontScaleInput.value;
-                forkShape.importScale = wavefrontScaleInput.value;
-            });
-            
-            forkShape = createFromWavefront(inputText);
-            
-        };
-        
-        reader.readAsText(inputFile);
-    };
-    var openWheel = function(event) {
-        
-        var inputFile = event.target.files[0];
-        var reader = new FileReader();
-        var inputText;
-        
-        reader.onload = function(){
-            inputText = reader.result;
-            
-            if (wavefrontScaleInput == null){
-                wavefrontScaleInput = document.createElement("INPUT");
-            }
-            wavefrontScaleInput.setAttribute("type", "number");
-            
-            document.body.insertBefore(wavefrontScaleInput,document.getElementById("Obj Scale"));
-            //wavefrontScaleInput.value = 1;
-            
-            wavefrontScaleInput.addEventListener("input", function (e){
-                wavefrontShape.importScale = wavefrontScaleInput.value;
-                wheelShape.importScale = wavefrontScaleInput.value;
-            });
-            
-            wheelShape = createFromWavefront(inputText);
-            
-        };
-        
-        reader.readAsText(inputFile);
-    };*/
     
     function createFromWavefront(text){
         
@@ -273,22 +190,6 @@
         .1
     );
     
-    /*var pyramidTestShape = new Shape(
-        [[0,0,40],
-        [50,50,0],
-        [50,-50,0],
-        [-50,-50,0],
-        [-50,50,0]],
-
-        [[0,1,2],
-        [0,2,3],
-        [0,3,4],
-        [0,4,1],
-        [0,1,3]],
-        
-        .1
-    );*/
-    
     function commitShapeToBuffer(shape, objectMatrix, cameraMatrix){
         var cVertex = [0,0,0];
         
@@ -301,7 +202,6 @@
             
             var newTri = new BufferTri();
             
-            //ctx.beginPath();
             for (var i = 0; i < 3; i++){
                 
                 m4.transformPoint(importScaleMatrix,shape.vertices[face[i]],cVertex);
@@ -316,22 +216,10 @@
                                      cVertex[1]+canvas.height/2+Math.random()*noise.value/10];
                 newTri.depth += cVertex[2];
                 
-                /*
-                if (i == 0){
-                    ctx.moveTo(cVertex[0]+canvas.width/2,cVertex[1]+canvas.height/2);
-                } else {
-                    ctx.lineTo(cVertex[0]+canvas.width/2,cVertex[1]+canvas.height/2);
-                }*/
             }
-            
-            //newTri.depth /= 3;
             
             triangleBuffer.push(newTri);
             
-            /*
-            ctx.closePath();
-            ctx.strokeStyle = "black";
-            ctx.stroke();*/
         });
     }
     
@@ -445,86 +333,11 @@
         m4.multiply(camMatrix,m4.rotationZ(camZRot),camMatrix);
         
         
-        // How to translate.
-        //m4.multiply(matrix,m4.translation([500,300,0]),matrix);
-        // How to rotate around an axis.
-        //m4.multiply(matrix,m4.rotationY(Math.PI*.5),matrix);
-        // How to scale.
-        //m4.multiply(matrix,m4.scaling([.8, .8, .8]),matrix);
-        
-        
         if (wavefrontShape != null){
             m4.multiply(matrix, m4.rotationX(Math.PI), matrix);
             m4.multiply(matrix, m4.translation([0,-modelHeight.value/5,0]),matrix);
             commitShapeToBuffer(wavefrontShape, m4.multiply(matrix, m4.rotationY(Math.PI*currTime*.1)), camMatrix);
         }
-        /*
-        if (liftShape != null){
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.translation([0,-Xrot.value*1.3/100*wavefrontScaleInput.value,0])));
-            drawShape(liftShape, matrixStack[0], camMatrix);
-        }
-        if (forkShape != null){
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.translation([0,-Yrot.value/100*wavefrontScaleInput.value,0])));
-            drawShape(forkShape, matrixStack[0], camMatrix);
-            matrixStack.shift();
-        }
-        if (liftShape != null){
-            matrixStack.shift();
-        }*/
-        
-        /*
-        if (wheelShape != null){
-            // Front Right
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
-            
-            matrixStack.unshift(m4.multiply(matrixStack[0],
-                m4.translation([-.95*wavefrontScaleInput.value,
-                                .1*wavefrontScaleInput.value,
-                                1.75*wavefrontScaleInput.value])));
-            
-            drawShape(wheelShape, matrixStack[0], camMatrix);
-            matrixStack.shift();
-            matrixStack.shift();
-            
-            // Back Right
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
-            
-            matrixStack.unshift(m4.multiply(matrixStack[0],
-                m4.translation([-.95*wavefrontScaleInput.value,
-                                .1*wavefrontScaleInput.value,
-                                -1.75*wavefrontScaleInput.value])));
-            drawShape(wheelShape, matrixStack[0], camMatrix);
-            matrixStack.shift();
-            matrixStack.shift();
-            
-            // Front Left
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.scaling([-1,-1,-1])));
-            
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
-            
-            matrixStack.unshift(m4.multiply(matrixStack[0],
-                m4.translation([.95*wavefrontScaleInput.value,
-                                .1*wavefrontScaleInput.value,
-                                1.75*wavefrontScaleInput.value])));
-            drawShape(wheelShape, matrixStack[0], camMatrix);
-            matrixStack.shift();
-            matrixStack.shift();
-            matrixStack.shift();
-            
-            // Back Left
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.scaling([-1,-1,-1])));
-            
-            matrixStack.unshift(m4.multiply(matrixStack[0],m4.rotationX(-currTime*Math.PI*Zrot.value/100)));
-            
-            matrixStack.unshift(m4.multiply(matrixStack[0],
-                m4.translation([.95*wavefrontScaleInput.value,
-                                .1*wavefrontScaleInput.value,
-                                -1.75*wavefrontScaleInput.value])));
-            drawShape(wheelShape, matrixStack[0], camMatrix);
-            matrixStack.shift();
-            matrixStack.shift();
-            matrixStack.shift();
-        }*/
         
         if (wavefrontShape == null){
             
