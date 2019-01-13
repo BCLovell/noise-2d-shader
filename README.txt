@@ -1,0 +1,7 @@
+This program takes as input any wavefront .obj file and renders it in 3D using only the 2D line-drawing functions of the HTML5 canvas. This means I perform the perspective and relative-space matrix transformations within the code and create my own graphical buffers to draw the shapes. I also wrote code to parse the .obj files so that they can be converted to an internal format, spacially transformed, buffered as triangles, colored, depth-ordered, and drawn.
+
+The addition of positional noise to the vertices was an addition motivated by depth-fighting, or the limitation of having to draw each triangle only once. Since the depth of a triangle is determined by the average depth of its vertices, there are some instances of triangles popping to the front of other triangles suddenly, causing an unexpected visual shift. However, when an appropriate amount of noisy movement is added to the whole shape, these artifacts become very difficult to notice.
+
+Perspective helped the rendered shapes to look three-dimensional, but they still looked somewhat flat and ill-defined, so I decided to add distance shading as a monocular depth cue. Facets of the shape that are further from the camera are shaded darker than ones toward the front, creating a more convincing effect.
+
+This project was the result of an assignment in a computer graphics course to draw a 3D object in the HTML5 canvas using only 2D drawing functions. Building this program gave me a deeper insight into the rendering process, 3D file formats, shader design, and hierarchical matrix transformations.
